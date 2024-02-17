@@ -1,3 +1,93 @@
+type Buyer = record {
+  id : nat64;
+  "principal" : principal;
+  name : text;
+  email : opt text;
+  organization : opt text;
+  phone_number : text;
+  location : text;
+};
+type BuyerPayload = record {
+  name : text;
+  email : opt text;
+  organization : opt text;
+  phone_number : text;
+  location : text;
+};
+type ContractStatus = variant {
+  Terminated;
+  InProgress;
+  Created;
+  Completed;
+  Pending;
+};
+type Farmer = record {
+  id : nat64;
+  updated_at : opt nat64;
+  "principal" : principal;
+  size_of_land : nat64;
+  name : text;
+  created_at : nat64;
+  national_id : text;
+  email : opt text;
+  phone_number : text;
+  location : text;
+  croptypes : vec text;
+};
+type FarmerPayload = record {
+  size_of_land : nat64;
+  name : text;
+  national_id : text;
+  email : opt text;
+  phone_number : text;
+  location : text;
+  croptypes : vec text;
+};
+type FutureContract = record {
+  id : nat64;
+  buyer_accepted : bool;
+  terms_and_conditions : text;
+  expected_month_of_harvest : text;
+  price_per_unit : nat64;
+  crop : text;
+  long_position_holder : opt principal;
+  bargain : opt text;
+  farmer_accepted : bool;
+  buyer : opt principal;
+  expected_yield : nat64;
+  farmer : opt principal;
+  short_position_holder : opt principal;
+  contract_status : ContractStatus;
+};
+type FutureContractPayload = record {
+  terms_and_conditions : text;
+  expected_month_of_harvest : text;
+  price_per_unit : nat64;
+  crop : text;
+  expected_yield : nat64;
+  contract_status : ContractStatus;
+};
+type Result = variant { Ok : FutureContract; Err : text };
+type Result_1 = variant { Ok : Buyer; Err : text };
+type Result_2 = variant { Ok : Farmer; Err : text };
 service : {
-    "greet": (text) -> (text) query;
+  add_buyer : (BuyerPayload) -> (opt Buyer);
+  add_farmer : (FarmerPayload) -> (opt Farmer);
+  claim_long_position : (nat64, opt text) -> (Result);
+  claim_short_position : (nat64, opt text) -> (Result);
+  create_future_contract : (FutureContractPayload) -> (opt FutureContract);
+  get_all_buyers : () -> (vec Buyer) query;
+  get_all_farmers : () -> (vec Farmer) query;
+  get_all_future_contracts : () -> (vec FutureContract) query;
+  get_buyer : (nat64) -> (Result_1) query;
+  get_buyer_by_principal : (principal) -> (Result_1) query;
+  get_contracts_by_buyer : (principal) -> (vec FutureContract) query;
+  get_contracts_by_contract_status : (ContractStatus) -> (
+      vec FutureContract,
+    ) query;
+  get_contracts_by_farmer : (principal) -> (vec FutureContract) query;
+  get_farmer : (nat64) -> (Result_2) query;
+  get_farmer_by_principal : (principal) -> (Result_2) query;
+  get_future_contract : (nat64) -> (Result) query;
+  get_principal : () -> (principal) query;
 }
