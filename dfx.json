@@ -1,0 +1,30 @@
+{
+  "canisters": {
+    "futures_backend": {
+      "candid": "src/futures_backend/futures_backend.did",
+      "package": "futures_backend",
+      "type": "rust"
+    },
+    "futures_frontend": {
+      "dependencies": [
+        "futures_backend"
+      ],
+      "frontend": {
+        "entrypoint": "src/futures_frontend/src/index.html"
+      },
+      "source": [
+        "src/futures_frontend/assets",
+        "dist/futures_frontend/"
+      ],
+      "type": "assets"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}
