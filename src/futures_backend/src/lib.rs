@@ -3,39 +3,31 @@ extern crate serde;
 use candid::{CandidType, Principal};
 use candid::{Decode, Encode};
 use ic_cdk::api::time;
-use ic_cdk::api::{caller, call::call};
+use std::result::Result;
 use ic_ledger_types::{
-    transfer, AccountIdentifier, BlockIndex, Memo, Tokens, TransferArgs, DEFAULT_FEE,
-    DEFAULT_SUBACCOUNT, MAINNET_LEDGER_CANISTER_ID,
+    transfer, 
+    AccountIdentifier,
+    Memo, 
+    Tokens,
+    TransferArgs,
+    DEFAULT_FEE,
+    DEFAULT_SUBACCOUNT,
 };
-
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
 use ic_stable_structures::{BoundedStorable, Cell, DefaultMemoryImpl, StableBTreeMap, Storable};
 use std::{borrow::Cow, cell::RefCell};
-use ic_cdk::storage;
+
+use lazy_static::lazy_static;
+
+lazy_static! {
+    static ref LEDGER_CANISTER_ID: Principal = Principal::from_text("be2us-64aaa-aaaaa-qaabq-cai").unwrap();
+}
+
 
 // Define the memory manager
 type Memory = VirtualMemory<DefaultMemoryImpl>;
 type IdCell = Cell<u64, Memory>;
 
-//initialize the memory manager
-#[ic_cdk::init]
-async fn init() -> () {
-    // Store the deployer's principal at initialization
-    let deployer = caller();
-    storage::stable_save((b"deployer", &deployer)).unwrap();
-}
-
-
-//define enum for contract status
-#[derive(candid::CandidType, Deserialize, Serialize, Clone, Debug, PartialEq)]
-enum ContractStatus {
-    Created,
-    Pending,
-    InProgress,
-    Completed,
-    Terminated,
-}
 
 //define the struct for the farmer
 #[derive(Clone, Debug, candid::CandidType, Deserialize, Serialize)]
@@ -121,6 +113,16 @@ struct BuyerPayload {
     location: String,
 }
 
+//define enum for contract status
+#[derive(candid::CandidType, Deserialize, Serialize, Clone, Debug, PartialEq)]
+enum ContractStatus {
+    Created,
+    Pending,
+    InProgress,
+    Completed,
+    Terminated,
+}
+
 //define the struct for the cropcontract
 #[derive(Clone, Debug, CandidType, Deserialize, Serialize)]
 struct FutureContract {
@@ -193,6 +195,7 @@ static STORAGE: RefCell<StableBTreeMap<u64, Farmer, Memory>> =
         MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(3)))
     ));
  }
+
 
 // get the farmer by id
 #[ic_cdk::query]
@@ -278,7 +281,7 @@ fn get_all_buyers() -> Vec<Buyer> {
     })
 }
 
-//get buyer by principal
+// get buyer by principal
 #[ic_cdk::query]
 fn get_buyer_by_principal(principal: Principal) -> Result<Buyer, String> {
     BUYER_STORAGE.with(|service| {
@@ -290,7 +293,8 @@ fn get_buyer_by_principal(principal: Principal) -> Result<Buyer, String> {
             .ok_or_else(|| format!("Buyer with principal={} not found", principal))
     })
 }
-//create a new buyer
+
+// create a new buyer
 #[ic_cdk::update]
 fn add_buyer(payload: BuyerPayload) -> Option<Buyer> {
     let id = ID_COUNTER.with(|counter| {
@@ -316,7 +320,7 @@ fn match_get_buyer(id: &u64) -> Option<Buyer> {
     BUYER_STORAGE.with(|service| service.borrow().get(id))
 }
 
-//helper method to perform the insert operation
+// helper method to perform the insert operation
 fn do_insert_buyer(buyer: &Buyer) {
     BUYER_STORAGE.with(|service| service.borrow_mut().insert(buyer.id, buyer.clone()));
 }
@@ -327,7 +331,7 @@ fn get_future_contract(id: u64) -> Result<FutureContract, String> {
     match_get_future_contract(&id).ok_or_else(|| format!("FutureContract with id={} not found", id))
 }
 
-//get all Future contracts
+// get all Future contracts
 #[ic_cdk::query]
 fn get_all_future_contracts() -> Vec<FutureContract> {
     FURURE_CONTRACT_STORAGE.with(|service| {
@@ -339,7 +343,7 @@ fn get_all_future_contracts() -> Vec<FutureContract> {
     })
 }
 
-//get Future contracts by contract status
+// get Future contracts by contract status
 #[ic_cdk::query]
 fn get_contracts_by_contract_status(contract_status: ContractStatus) -> Vec<FutureContract> {
     FURURE_CONTRACT_STORAGE.with(|service| {
@@ -352,13 +356,13 @@ fn get_contracts_by_contract_status(contract_status: ContractStatus) -> Vec<Futu
     })
 }
 
-//get Future contracts by farmer
+// get Future contracts by farmer
 #[ic_cdk::query]
  fn get_contracts_by_farmer(farmer: Principal) -> Vec<FutureContract> {
     FURURE_CONTRACT_STORAGE.with(|service| service.borrow().iter().map(|(_key, value)| value.clone()).filter(|contract| contract.farmer == Some(farmer)).collect())
 }
 
-//get Future contracts by buyer
+// get Future contracts by buyer
 #[ic_cdk::query]
 fn get_contracts_by_buyer(buyer: Principal) -> Vec<FutureContract> {
     FURURE_CONTRACT_STORAGE.with(|service| {
@@ -371,7 +375,7 @@ fn get_contracts_by_buyer(buyer: Principal) -> Vec<FutureContract> {
     })
 }
 
-//create a new Future contract
+// create a new Future contract
 #[ic_cdk::update]
 fn create_future_contract(payload: FutureContractPayload) -> Option<FutureContract> {
     let id = ID_COUNTER.with(|counter| {
@@ -404,7 +408,7 @@ fn match_get_future_contract(id: &u64) -> Option<FutureContract> {
     FURURE_CONTRACT_STORAGE.with(|service| service.borrow().get(id))
 }
 
-//helper method to perform the insert operation
+// a helper method to perform the insert operation
 fn do_insert_future_contract(future_contract: &FutureContract) {
     FURURE_CONTRACT_STORAGE.with(|service| {
         service
@@ -413,9 +417,9 @@ fn do_insert_future_contract(future_contract: &FutureContract) {
     });
 }
 
-//method to accept the contract by the farmer
+// method to accept the contract by the farmer
 #[ic_cdk::update]
-async fn claim_short_position(id: u64, bargain: Option<String>) -> Result<FutureContract, String> {
+async fn claim_short_position(id: u64, bargain: Option<String>, to_principal: Principal) -> Result<FutureContract, String> {
 
     let amount = Tokens::from_e8s(1_000_000);
     let mut future_contract = match_get_future_contract(&id)
@@ -433,13 +437,19 @@ async fn claim_short_position(id: u64, bargain: Option<String>) -> Result<Future
     future_contract.bargain = Some(bargain.unwrap_or("".to_string()));
     do_insert_future_contract(&future_contract);
     // Call the async function to transfer margin
-    transfer_margin(amount).await;
-    Ok(future_contract)
+    match transfer_margin(amount, to_principal).await{
+        Ok(_block_index) => {
+            Ok(future_contract)
+        },
+        Err(e) => {
+            return Err(format!("Failed to transfer margin: {}", e));
+        }
+    }
 }
 
-//method to accept the contract by the buyer
+// method to accept the contract by the buyer
 #[ic_cdk::update]
-async fn claim_long_position(id: u64, bargain: Option<String>) -> Result<FutureContract, String> {
+async fn claim_long_position(id: u64, bargain: Option<String>, to_principal: Principal) -> Result<FutureContract, String> {
     let amount = Tokens::from_e8s(1_000_000);
     let mut future_contract = match_get_future_contract(&id)
         .ok_or_else(|| format!("FutureContract with id={} not found", id))?;
@@ -456,8 +466,14 @@ async fn claim_long_position(id: u64, bargain: Option<String>) -> Result<FutureC
     future_contract.bargain = Some(bargain.unwrap_or("".to_string()));
     do_insert_future_contract(&future_contract);
     // Call the async function to transfer margin
-    transfer_margin(amount).await;
-    Ok(future_contract)
+    match transfer_margin(amount, to_principal).await{
+        Ok(_block_index) => {
+            Ok(future_contract)
+        },
+        Err(e) => {
+            return Err(format!("Failed to transfer margin: {}", e));
+        }
+    }
 }
 
 // get principal
@@ -467,54 +483,35 @@ fn get_principal() -> Principal {
 }
 
 
-async fn transfer_margin(amount: Tokens) -> Result<BlockIndex, String> {
-     // Retrieve the deployer's principal from stored state
-     let deployer: Principal = storage::stable_restore().map_err(|err| format!("Failed to retrieve deployer's principal: {:?}", err))?;
+// a hellper method to transfer tokens after the contract has been accepted
+
+async fn transfer_margin(amount: Tokens, to_principal: Principal ) -> Result<u64, String> {
 
     // Construct the transfer arguments
     let transfer_args = TransferArgs {
-        memo: Memo(0), // Memo can be set to any value
+        memo: Memo(0), 
         amount,
-        fee: DEFAULT_FEE, // Use the default fee or customize as needed
-        from_subaccount: None, // Since this is a transfer from the canister, set from_subaccount to None
-        to: AccountIdentifier::new(&deployer, &DEFAULT_SUBACCOUNT), // Set the recipient's principal and default subaccount
-        created_at_time: None, // Optional parameter
+        fee: DEFAULT_FEE,
+        from_subaccount: None, 
+        to: AccountIdentifier::new(&to_principal, &DEFAULT_SUBACCOUNT), 
+        created_at_time: None, 
     };
 
     // Perform the transfer
-    let result = ic_ledger_types::transfer(
-        MAINNET_LEDGER_CANISTER_ID, // The ledger canister ID
-        transfer_args, // Transfer arguments
+    let block_index_result = transfer(
+        *LEDGER_CANISTER_ID, 
+        transfer_args, 
     )
     .await;
 
-    // Handle the result of the transfer
-    match result {
-        Ok(block_index) => Ok(block_index),
-        Err(err) => Err(format!("Failed to transfer tokens: {:?}", err)),
-    }
+    // If the transfer was successful, return the block index
+        match block_index_result {
+            Ok(Ok(block_index)) => Ok(block_index),
+            Ok(Err(transfer_error)) => Err(transfer_error.to_string()),
+            Err((rejection_code, error_message)) => Err(format!("Rejection code: {:?}, error message: {}", rejection_code, error_message)),
+        }
+   
 }
 
-
-// a hellper method to transfer tokens after the contract has been accepted
-// async fn transfer_margin() -> BlockIndex {
-//     // Retrieve the deployer's principal from stored state
-//     let deployer: Principal = storage::stable_restore().unwrap();
-
-//     transfer(
-//         MAINNET_LEDGER_CANISTER_ID,
-//         TransferArgs {
-//             memo: Memo(0),
-//             amount: Tokens::from_e8s(1_000_000),
-//             fee: DEFAULT_FEE,
-//             from_subaccount: None,
-//             to: AccountIdentifier::new(&deployer, &DEFAULT_SUBACCOUNT),
-//             created_at_time: None,
-//         }
-//     )
-//     .await
-//     .expect("call to ledger failed")
-//     .expect("transfer failed")
-// }
 
 ic_cdk::export_candid!();

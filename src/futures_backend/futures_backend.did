@@ -73,8 +73,8 @@ type Result_2 = variant { Ok : Farmer; Err : text };
 service : {
   add_buyer : (BuyerPayload) -> (opt Buyer);
   add_farmer : (FarmerPayload) -> (opt Farmer);
-  claim_long_position : (nat64, opt text) -> (Result);
-  claim_short_position : (nat64, opt text) -> (Result);
+  claim_long_position : (nat64, opt text, principal) -> (Result);
+  claim_short_position : (nat64, opt text, principal) -> (Result);
   create_future_contract : (FutureContractPayload) -> (opt FutureContract);
   get_all_buyers : () -> (vec Buyer) query;
   get_all_farmers : () -> (vec Farmer) query;
